@@ -1,13 +1,28 @@
 (function($) {
-    var highlight = function(text, escapedTerm){
-      return text.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + escapedTerm + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<strong>$1</strong>");
-    };
-
     $.widget("ui.combobox", {
         options: {
-            filter: null,
-            prepareFilter: null,
-            placeholder: null,
+            dataFilter: null,
+
+            data: function(ui) {
+                ui.data = ui.data || ui.element.find("option").map(function() {
+                    if (!this.value) {
+                        return null;
+                    }
+                    var text = this.innerText || this.textContent;
+                    return {
+                        text: text,
+                        trimmed: text.trim(),
+                        option: this
+                    };
+                });
+                return ui.data;
+            },
+
+            highlight: function(text, escapedTerm){
+                return text.replace(new RegExp("(?![^&;]+;)(?!<[^<>]*)(" + escapedTerm + ")(?![^<>]*>)(?![^&;]+;)", "gi"), "<strong>$1</strong>");
+            },
+
+            placeholder: "Type to search...",
             preventFormSubmit: true
         },
 
@@ -22,7 +37,7 @@
             var options = this.options;
 
 
-            var self = this,
+            var self = this, data = options.data,
                     $select = this.element.hide(),
                     selected = $select.children(":selected"),
                     value = selected.val() ? selected.text() : "";
@@ -30,13 +45,11 @@
                     .insertAfter($select)
                     .val(value);
 
-            var filter = options['filter'],
-                    prepareFilter = options['prepareFilter'],
+            var filter = options.dataFilter,
                     placeholder = $select.attr('data-placeholder') || options['placeholder'];
 
-            if (placeholder) {
-                $input.attr('placeholder', placeholder);
-            }
+            placeholder && $input.attr('placeholder', placeholder);
+
 
             if (options.preventFormSubmit) {
                 $input.keydown(function(event){
@@ -48,18 +61,6 @@
                 });
             }
 
-            var data = $select.find("option").map(function() {
-                if (!this.value) {
-                    return null;
-                }
-                var text = this.innerText || this.textContent;
-                return {
-                    original: text,
-                    trimmed: text.trim(),
-                    option: this
-                };
-            });
-
             $input.autocomplete({
                 delay: 0,
                 minLength: 0,
@@ -68,11 +69,11 @@
                 source: function(request, response) {
                     var termForRegex = $.ui.autocomplete.escapeRegex(request.term),
                             matcher = new RegExp(termForRegex, "i");
-                    prepareFilter && prepareFilter(request.term);
-                    response(data.map(function() {
+                    self._trigger("search", event, request.term);
+                    response(data(self).map(function() {
                         if (this && (!request.term || matcher.test(this.trimmed)) && !(filter && filter(this)))
                             return {
-                                label: highlight(this.original, termForRegex),
+                                label: options.highlight(this.text, termForRegex),
                                 value: this.trimmed,
                                 option: this.option
                             };
@@ -85,8 +86,8 @@
                     }
                     var matcher = new RegExp("^" + $.ui.autocomplete.escapeRegex($(this).val()) + "$", "i"),
                             valid = false;
-                    prepareFilter && prepareFilter($(this).val());
-                    data.each(function() {
+                    self._trigger("search", event, $(this).val());
+                    data(self).each(function() {
                         if (matcher.test(this.trimmed) && !(filter && filter(this))) {
                             this.option.selected = valid = true;
                             self._trigger("selected", event, {
