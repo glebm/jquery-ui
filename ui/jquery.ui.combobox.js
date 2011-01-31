@@ -8,12 +8,19 @@
                     if (!this.value) {
                         return null;
                     }
-                    var text = this.innerText || this.textContent;
-                    return {
-                        text: text,
-                        trimmed: text.trim(),
-                        option: this
-                    };
+                    var text   = this.innerText || this.textContent,
+                        parent = this.parentNode,
+                        result = {
+                            text   : text       ,
+                            trimmed: text.trim(),
+                            option : this
+                        };
+
+                    if (parent && parent.nodeType === 1 && parent.nodeName.toLowerCase() == "optgroup") {
+                        result.group = parent.label;
+                    }
+                    
+                    return result;
                 });
                 return ui.data;
             },
@@ -75,6 +82,7 @@
                             return {
                                 label: options.highlight(this.text, termForRegex),
                                 value: this.trimmed,
+                                group: this.group,
                                 option: this.option
                             };
                     }));
@@ -114,6 +122,17 @@
             });
 
             $input.addClass("ui-widget ui-widget-content ui-corner-left");
+
+            $input.data("autocomplete")._renderMenu = function(ul, items) {
+                var self = this, currentGroup = "";
+                $.each(items, function(index, item) {
+                    if (item.group && item.group != currentGroup) {
+                        ul.append("<li class='ui-combobox-group'>" + item.group + "</li>");
+                        currentGroup = item.group;
+                    }
+                    self._renderItem(ul, item);
+                });
+            };
 
             $input.data("autocomplete")._renderItem = function(ul, item) {
                 return $("<li></li>")
