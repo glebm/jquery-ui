@@ -37,7 +37,7 @@
                 search: function() {
                     excludeFromResults = {};
                     $('#tags li').each(function() {
-                       excludeFromResults[this.innerText || this.textContent] = true;
+                        excludeFromResults[this.innerText || this.textContent] = true;
                     });
                 },
 
@@ -45,12 +45,12 @@
                     return excludeFromResults[record.text];
                 },
 
-                selected: function(event, ui) {	
+                selected: function(event, ui) {
                     $('#tags').append('<li>' + (ui.item.innerText || ui.item.textContent) + '</li>');
                     // Clear the selected value
-		    $combo.combobox('clear');
-		    // Disable default behaviour:
-		    return false;
+                    $combo.combobox('clear');
+                    // Disable default behaviour:
+                    return false;
                 }
             });
 
