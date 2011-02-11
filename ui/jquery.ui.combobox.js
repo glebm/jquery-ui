@@ -15,6 +15,7 @@
             },
 
             placeholder: "Type to search...",
+            primaryButtonIcon: "ui-icon-triangle-1-s",
             preventFormSubmit: true
         },
 
@@ -43,7 +44,8 @@
             });
 
             var filter = options.dataFilter,
-                    placeholder = $select.attr('data-placeholder') || options['placeholder'];
+                    placeholder = $select.attr('data-placeholder') || options['placeholder'],
+                    primaryButtonIcon = $select.attr('data-primary-button-icon') || options['primaryButtonIcon'];
 
             placeholder && $input.attr('placeholder', placeholder);
 
@@ -184,11 +186,11 @@
 
             this.button = $("<button type='button' class='combobox'>&nbsp;</button>")
                     .attr("tabIndex", -1)
-                    .attr("title", "Show All Items")
+                    .attr("title", "Show All")
                     .insertAfter($input)
                     .button({
                                 icons: {
-                                    primary: "ui-icon-triangle-1-s"
+                                    primary: primaryButtonIcon
                                 },
                                 text: false
                             })
