@@ -74,7 +74,7 @@
                 $input.keydown(function(event) {
                     if (event.keyCode == 13) {
                         event.preventDefault();
-                        $input.autocomplete('option', 'change').call($input, event, {});
+                        $input.autocomplete('option', 'change').call($input[0], event, {});
                         $input.autocomplete('close')
                     }
                 });
@@ -148,41 +148,69 @@
             $ac._suggest = function(items) {
                 var ul = this.menu.element.zIndex(this.element.zIndex() + 1);
                 this._renderMenu(ul, items);
+                // Not using jQuery UI Position -- important speed optimization
+                var pos = this.element.offset();
+                pos.top += this.element.outerHeight();
                 ul.show();
-                this._resizeMenu();
-                ul.position($.extend({
-                    of: this.element
-                }, this.options.position));
+                ul.css(pos);
             };
 
-            $ac._renderMenu = function(ul, items) {
-                    var currentGroup = "", listElements = [];
+            $ac._renderMenu = function($ul, items) {
+                    var currentGroup = "", ul = $ul[0];
+
+                    while (ul.hasChildNodes()) {
+                        ul.removeChild(ul.lastChild);
+                    }
+
                     $.each(items, function(index, item) {
                         if (item.group && item.group != currentGroup) {
-                            listElements[listElements.length] = "<li class='ui-menu-item ui-combobox-group'>" +
-                                    $.ui.combobox.escapeHTML(item.group) + "</li>";
+                            var groupLi = document.createElement('li');
+                            groupLi.className = 'ui-menu-item ui-combobox-group';
+                            groupLi.appendChild(document.createTextNode(item.group));
                             currentGroup = item.group;
+                            ul.appendChild(groupLi);
                         }
 
-                        listElements[listElements.length] = "<li class='ui-menu-item' data-value='" +
-                                item.optionValue.replace(/'/g, '&#39;') +
-                                "'><a class='ui-corner-all' tabIndex='-1'>" + item.label + "</a></li>";
-                    });
 
-                    ul[0].innerHTML = listElements.join("");
+                        var li = document.createElement('li'), a = document.createElement('a');
+                        a.className = 'ui-corner-all';
+                        a.setAttribute('tabIndex', -1);
+
+                        // item.label contains <b> parts
+                        a.innerHTML = item.label;
+
+                        li.className = 'ui-menu-item';
+                        li.setAttribute('data-value', item.optionValue);
+                        li.appendChild(a);
+
+                        ul.appendChild(li);
+                    });
                 };
 
-            var $mc = $ac.menu.options, $mcFocus = $mc.focus, $mcSelect = $mc.select;
-            $mc.select = function(event, ui) {
+            var menuOptions = $ac.menu.options, menuFocusHandler = menuOptions.focus, menuSelectHandler = menuOptions.select;
+            menuOptions.select = function(event, ui) {
                 ui.item.data("item.autocomplete", autocompleteDataByValue[ui.item.attr('data-value')]);
-                $mcSelect.call(this, event, ui);
+                menuSelectHandler.call(this, event, ui);
             };
 
-            $mc.focus = function(event, ui) {
+            menuOptions.focus = function(event, ui) {
                 ui.item.data("item.autocomplete", autocompleteDataByValue[ui.item.attr('data-value')]);
-                $mcFocus.call(this, event, ui);
+                menuFocusHandler.call(this, event, ui);
             };
 
+            var dropDownAll = function() {
+                // close if already visible
+                if ($input.autocomplete("widget").is(":visible")) {
+                    // Hide the menu instead of running slow default close
+                    $ac.menu.element.hide();
+                    return;
+                }
+                // Native focus to avoid triggering handlers
+                $input[0].focus();
+
+                // pass empty string as value to search for, displaying all results
+                $input.autocomplete("search", "");
+            };
 
             this.button = $("<button type='button' class='combobox'>&nbsp;</button>")
                     .attr("tabIndex", -1)
@@ -196,17 +224,7 @@
                             })
                     .removeClass("ui-corner-all")
                     .addClass("ui-corner-right ui-button-icon")
-                    .click(function() {
-                // close if already visible
-                if ($input.autocomplete("widget").is(":visible")) {
-                    $input.autocomplete("close");
-                    return;
-                }
-
-                // pass empty string as value to search for, displaying all results
-                $input.autocomplete("search", "");
-                $input.focus();
-            });
+                    .click(dropDownAll);
         },
 
         destroy: function() {
