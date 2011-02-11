@@ -1,33 +1,11 @@
 (function($, undefined) {
+    var dataByValue = {}, autocompleteDataByValue = {};
 
     $.widget("ui.combobox", {
         options: {
             dataFilter: null,
 
             minLength: 1,
-
-            data: function(ui) {
-                ui.data = ui.data || ui.element.find("option").map(function() {
-                    if (!this.value) {
-                        return null;
-                    }
-                    var text = this.innerText || this.textContent,
-                            parent = this.parentNode,
-                            result = {
-                                text   : text       ,
-                                trimmed: text.trim(),
-                                value  : this.value
-                            };
-
-                    if (parent && parent.nodeType === 1 && parent.nodeName.toLowerCase() == "optgroup") {
-                        result.group = parent.label;
-                    }
-
-                    return result;
-                });
-                return ui.data;
-            },
-
 
             highlight: function(text, escapedTerm) {
                 if (!escapedTerm) {
@@ -51,7 +29,7 @@
             var options = this.options;
 
 
-            var self = this, data = options.data,
+            var self = this,
                     $select = this.element.hide(),
                     selected = $select.children(":selected"),
                     value = selected.val() ? selected.text() : "";
@@ -68,6 +46,26 @@
                     placeholder = $select.attr('data-placeholder') || options['placeholder'];
 
             placeholder && $input.attr('placeholder', placeholder);
+
+            var data = $select.find("option").map(function() {
+                if (!this.value) {
+                    return null;
+                }
+                var text = this.innerText || this.textContent,
+                        parent = this.parentNode,
+                        result = {
+                            text   : text       ,
+                            trimmed: text.trim(),
+                            value  : this.value
+                        };
+
+                if (parent && parent.nodeType === 1 && parent.nodeName.toLowerCase() == "optgroup") {
+                    result.group = parent.label;
+                }
+                dataByValue[this.value] = result;
+
+                return result;
+            });
 
 
             if (options.preventFormSubmit) {
@@ -93,14 +91,16 @@
                     var termForRegex = $.ui.autocomplete.escapeRegex(request.term),
                             matcher = new RegExp(termForRegex, "i");
                     self._trigger("search", null, request.term);
-                    response(data(self).map(function() {
+                    response(data.map(function() {
+                        var result;
                         if (this && (!request.term || matcher.test(this.trimmed)) && !(filter && filter(this)))
-                            return {
+                            autocompleteDataByValue[this.value] = result = {
                                 label: options.highlight(this.text, termForRegex),
                                 value: this.trimmed,
                                 group: this.group,
                                 optionValue: this.value
                             };
+                            return result;
                     }));
                 },
 
@@ -108,12 +108,11 @@
                     if (ui.item) {
                         return false;
                     }
-                    var matcher = new RegExp("^" + $.ui.autocomplete.escapeRegex($(this).val()) + "$", "i"),
-                            valid = false;
-                    self._trigger("search", event, $(this).val());
-                    data(self).each(function() {
+                    var matcher = new RegExp("^" + $.ui.autocomplete.escapeRegex(this.value) + "$", "i"), valid = false;
+                    data.each(function() {
                         if (matcher.test(this.trimmed) && !(filter && filter(this))) {
                             var option = optionByValue[this.value];
+                            $input[0].value = this.trimmed;
                             option.selected = valid = true;
                             self._trigger("selected", event, {
                                 item: option
@@ -143,24 +142,45 @@
 
             $input.addClass("ui-widget ui-widget-content ui-corner-left");
 
-            $input.data("autocomplete")._renderMenu = function(ul, items) {
-                var currentGroup = "", listElements = [];
-                $.each(items, function(index, item) {
-                    if (item.group && item.group != currentGroup) {
-                        listElements[listElements.length] = "<li class='ui-combobox-group'>" + $.ui.combobox.escapeHTML(item.group) + "</li>";
-                        currentGroup = item.group;
-                    }
-
-                    listElements[listElements.length] = "<li data-item.autocomplete='" +
-                            JSON.stringify(item).replace(/'/g, '&#39;') + "'><a>" + item.label + "</a></li>";
-                });
-
-                ul[0].innerHTML = listElements.join("");
-
-//                ul.find("li:not(.ui-combobox-group)").each(function(i) {
-//                   $(this).data("item.autocomplete", items[i]);
-//                });
+            var $ac = $input.data("autocomplete");
+            $ac._suggest = function(items) {
+                var ul = this.menu.element.zIndex(this.element.zIndex() + 1);
+                this._renderMenu(ul, items);
+                ul.show();
+                this._resizeMenu();
+                ul.position($.extend({
+                    of: this.element
+                }, this.options.position));
             };
+
+            $ac._renderMenu = function(ul, items) {
+                    var currentGroup = "", listElements = [];
+                    $.each(items, function(index, item) {
+                        if (item.group && item.group != currentGroup) {
+                            listElements[listElements.length] = "<li class='ui-menu-item ui-combobox-group'>" +
+                                    $.ui.combobox.escapeHTML(item.group) + "</li>";
+                            currentGroup = item.group;
+                        }
+
+                        listElements[listElements.length] = "<li class='ui-menu-item' data-value='" +
+                                item.optionValue.replace(/'/g, '&#39;') +
+                                "'><a class='ui-corner-all' tabIndex='-1'>" + item.label + "</a></li>";
+                    });
+
+                    ul[0].innerHTML = listElements.join("");
+                };
+
+            var $mc = $ac.menu.options, $mcFocus = $mc.focus, $mcSelect = $mc.select;
+            $mc.select = function(event, ui) {
+                ui.item.data("item.autocomplete", autocompleteDataByValue[ui.item.attr('data-value')]);
+                $mcSelect.call(this, event, ui);
+            };
+
+            $mc.focus = function(event, ui) {
+                ui.item.data("item.autocomplete", autocompleteDataByValue[ui.item.attr('data-value')]);
+                $mcFocus.call(this, event, ui);
+            };
+
 
             this.button = $("<button type='button' class='combobox'>&nbsp;</button>")
                     .attr("tabIndex", -1)
